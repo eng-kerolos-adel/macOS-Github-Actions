@@ -1,0 +1,156 @@
+# =====================================================
+#  KeroCodes — macOS Build Workflow
+#  بتشتغل على Windows وعايز تبني تطبيق macOS؟
+#  كوبي الفايل ده جوه .github/workflows/
+#  واستمتع بالـ Build مجاناً على سيرفرات GitHub!
+# =====================================================
+
+name: Build macOS App
+
+# ---- متى يشتغل الـ Workflow؟ ----
+on:
+  push:
+    branches:
+      - main          # اشتغل لما تعمل push على branch الـ main
+      - develop       # أو على branch الـ develop
+  pull_request:
+    branches:
+      - main          # أو لما تفتح Pull Request على main
+  workflow_dispatch:  # أو تشغيله يدوي من GitHub
+
+# =====================================================
+#  الـ Jobs — الشغل الحقيقي بيحصل هنا
+# =====================================================
+jobs:
+
+  # ---- Job 1: Build Flutter App على macOS ----
+  build-macos-flutter:
+    name: 🍎 Build Flutter macOS App
+    runs-on: macos-latest          # ← السحر هنا! سيرفر Mac مجاني كامل!
+    # هتشيل اللي مش محتاجه، وتفضل الـ job اللي ينفعك بس
+
+    steps:
+
+      # Step 1: جلب الكود بتاعك
+      - name: ⬇️ Checkout Repository
+        uses: actions/checkout@v4
+
+      # Step 2: تثبيت Flutter
+      - name: 🐦 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.0'        # ← غيّر للـ version اللي شغال عليها
+          channel: 'stable'
+          cache: true                       # Cache عشان تسرّع الـ Build الجاي
+
+      # Step 3: تفعيل دعم macOS
+      - name: 🖥️ Enable macOS Desktop Support
+        run: flutter config --enable-macos-desktop
+
+      # Step 4: تثبيت الـ Dependencies
+      - name: 📦 Install Dependencies
+        run: flutter pub get
+
+      # Step 5: تشغيل الـ Tests (اختياري بس محترف)
+      - name: 🧪 Run Tests
+        run: flutter test
+        continue-on-error: true            # الـ build يكمل حتى لو في test فشل
+
+      # Step 6: الـ Build الفعلي للـ macOS App
+      - name: 🔨 Build macOS Application
+        run: flutter build macos --release
+
+      # Step 7: رفع الـ Output عشان تقدر تحمله
+      - name: 📤 Upload macOS App
+        uses: actions/upload-artifact@v4
+        with:
+          name: macOS-App-${{ github.sha }}    # اسم فريد لكل build
+          path: build/macos/Build/Products/Release/
+          retention-days: 14                    # احتفظ بيه 14 يوم
+
+  # =====================================================
+  # ---- Job 2: Build Tauri App على macOS ----
+  # (لو بتستخدم Tauri بدل Flutter، استخدم الـ Job ده)
+  # =====================================================
+  build-macos-tauri:
+    name: 🦀 Build Tauri macOS App
+    runs-on: macos-latest
+    if: false    # ← غيّر لـ true لو شغال بـ Tauri
+
+    steps:
+
+      - name: ⬇️ Checkout Repository
+        uses: actions/checkout@v4
+
+      # تثبيت Node.js للـ Frontend
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # تثبيت Rust للـ Tauri Backend
+      - name: 🦀 Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin, x86_64-apple-darwin  # Intel + Apple Silicon
+
+      # Cache الـ Rust Dependencies
+      - name: 📦 Cache Rust Dependencies
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      # تثبيت الـ npm packages
+      - name: 📦 Install Node Dependencies
+        run: npm install
+
+      # Build الـ Tauri App
+      - name: 🔨 Build Tauri macOS App
+        run: npm run tauri build
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # رفع الـ .dmg و .app
+      - name: 📤 Upload Tauri macOS Build
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tauri-macOS-${{ github.sha }}
+          path: |
+            src-tauri/target/release/bundle/dmg/
+            src-tauri/target/release/bundle/macos/
+          retention-days: 14
+
+  # =====================================================
+  # ---- Job 3: Build React Native macOS (Expo) ----
+  # (اختياري - لو بتستخدم React Native / Expo)
+  # =====================================================
+  build-macos-expo:
+    name: ⚛️ Build Expo macOS App
+    runs-on: macos-latest
+    if: false    # ← غيّر لـ true لو شغال بـ Expo
+
+    steps:
+
+      - name: ⬇️ Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 📦 Install Dependencies
+        run: npm install
+
+      - name: 🔨 Build macOS App via Expo
+        run: npx expo run:macos --configuration Release
+
+      - name: 📤 Upload Expo macOS Build
+        uses: actions/upload-artifact@v4
+        with:
+          name: Expo-macOS-${{ github.sha }}
+          path: macos/build/
+          retention-days: 14
+
